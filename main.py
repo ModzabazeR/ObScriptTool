@@ -3,13 +3,15 @@
 
 import csv
 import json
+import os
 from sys import exit
 import add
 import alphabet as alp
 import rearrange as rr
 
 # https://stackoverflow.com/questions/287871/how-to-print-colored-text-to-the-terminal
-print('\033[93m' + "IMPORTANT: If you can't read the Thai alphabets, please change the console program such as 'Terminal' on Windows" + '\033[0m')
+os.system("")
+print('\033[93m' + "IMPORTANT: If Thai alphabets are not display properly, please run this program in different console program" + '\033[0m')
 print()
 
 # Get config
