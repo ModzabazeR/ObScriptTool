@@ -8,6 +8,10 @@ import add
 import alphabet as alp
 import rearrange as rr
 
+# https://stackoverflow.com/questions/287871/how-to-print-colored-text-to-the-terminal
+print('\033[93m' + "IMPORTANT: If you can't read the Thai alphabets, please change the console program such as 'Terminal' on Windows" + '\033[0m')
+print()
+
 # Get config
 with open("config.json", "r", encoding="utf8") as config_file:
     config = json.load(config_file) 
