@@ -73,12 +73,12 @@ def detect_vowel(filename: str) -> int:
                     vowels_data[vowel]["count"] += 1
                     count += 1
 
-    print()
-    for vowel in vowels_data:
-        
-        if vowels_data[vowel]["count"] > 0:
-            print(f"{vowels_data[vowel]['name']} : {vowels_data[vowel]['count']}")
-    print()
+    if count > 0:
+        print()
+        for vowel in vowels_data:
+            if vowels_data[vowel]["count"] > 0:
+                print(f"{vowels_data[vowel]['name']} : {vowels_data[vowel]['count']}")
+        print()
 
     return count
 
