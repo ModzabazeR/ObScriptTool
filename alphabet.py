@@ -22,6 +22,7 @@ def encode(toc:DataFrame, script_file: str) -> None:
     entries = toc.to_dict("records")
     lst = []
     counter = 0
+    vowels.fix_sara_um(script_file)
     f = open(script_file, "r", encoding="utf8", errors="ignore")
     for line in f:
         for letter in entries:

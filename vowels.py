@@ -1,3 +1,38 @@
+def fix_sara_um(filename: str) -> None:
+    prob_list = [
+    {
+        "source": "่ำ",
+        "replace": "ํ่า",
+    },
+    {
+        "source": "้ำ",
+        "replace": "ํ้า",
+    },
+    {
+        "source": "๊ำ",
+        "replace": "ํ๊า",
+    },
+    {
+        "source": "๋ำ",
+        "replace": "ํ๋า",
+    },
+    {
+        "source": "ำ",
+        "replace": "ํา",
+    },
+]
+    with open(filename, "r", encoding="utf-8") as f:
+        lst = []
+        for line in f:
+            for prob in prob_list:
+                line = line.replace(prob["source"], prob["replace"])
+            lst.append(line)
+
+    with open(filename, "w", encoding="utf-8") as f:
+        for line in lst:
+            f.write(line)
+
+
 def detect_vowel(filename: str) -> int:
     # list of Thai vowels
     vowels = [
@@ -85,4 +120,6 @@ def detect_vowel(filename: str) -> int:
 
 if __name__ == "__main__":
     script = input("File Name: ")
+    fix_sara_um(script)
     print(detect_vowel(script))
+    
