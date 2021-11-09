@@ -130,6 +130,7 @@ dmypy.json
 
 # Others
 sghdchar.py
+*.old.py
 *.txt
 *.bat
 *.ico
