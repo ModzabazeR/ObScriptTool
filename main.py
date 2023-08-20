@@ -8,6 +8,10 @@ from sys import exit
 import add
 import alphabet as alp
 import rearrange as rr
+from tkinter import filedialog, Tk
+
+root = Tk()
+root.withdraw()
 
 # https://stackoverflow.com/questions/287871/how-to-print-colored-text-to-the-terminal
 os.system("")
@@ -31,30 +35,35 @@ toc_file = config["toc_file"]
 entries = pd.read_csv(toc_file, encoding="utf8")
 print("Total entries found: {0}".format(len(entries)))
 
-# Add new strings and update TOC
-add.add_str(entries, KAN_CHARSET)
-add.update_toc(entries, toc_file)
-print("Updated entries: {0}".format(len(entries)))
-print()
+want_update = input("Do you want to update TOC (y/n): ")
+if want_update.lower() == "y":
+	# Add new strings and update TOC
+	add.add_str(entries, KAN_CHARSET)
+	add.update_toc(entries, toc_file)
+	print("Updated entries: {0}".format(len(entries)))
+	print()
 
 # Encode the file
 print("Mode: " + config["mode"])
-script_file = input("File to process: ")
+filenames = filedialog.askopenfilenames(title="File(s) to process")
 print()
 alp.startup()
 print()
-if config["mode"] == "encode":
-    print("Encoding...")
-    alp.encode(entries, script_file)
-else:
-    print("Decoding...")
-    alp.decode(entries, script_file)
-print()
+for script_file in filenames:
+	base_name = os.path.basename(script_file)
+	if config["mode"] == "encode":
+		print(f"Encoding... {base_name}")
+		alp.encode(entries, base_name)
+	else:
+		print(f"Decoding... {base_name}")
+		alp.decode(entries, base_name)
+	print()
 
 # Rearrange TOC file
-print("Rearranging...")
-rr.create_ordered_toc(toc_file, "ordered_encoding_toc.csv")
-print()
+if want_update.lower() == "y":
+	print("Rearranging...")
+	rr.create_ordered_toc(toc_file, "ordered_encoding_toc.csv")
+	print()
 
 print("All done.")
 print("Please check the output file.")

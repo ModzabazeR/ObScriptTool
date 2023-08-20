@@ -50,7 +50,8 @@ def detect_vowel(filename: str) -> int:
         "้",
         "๊",
         "๋",
-        "์", ]
+        "์", 
+		"ํ"]
 
     vowels_data = {
         "ั": {
@@ -98,6 +99,9 @@ def detect_vowel(filename: str) -> int:
         "์": {
             "name": "การันต์ (karan)",
             "count": 0},
+		"ํ": {
+			"name": "นิคหิต (nikahit)",
+			"count": 0},
     }
 
     with open(filename, "r", encoding="utf-8") as f:
