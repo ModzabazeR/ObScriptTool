@@ -17,7 +17,7 @@ def startup() -> None:
     if not os.path.exists('output'):
         os.makedirs('output')
 
-def encode(toc:DataFrame, script_file: str) -> None:
+def encode(toc: DataFrame, script_file: str) -> int:
     os.system("")
     entries = toc.to_dict("records")
     lst = []
@@ -35,8 +35,10 @@ def encode(toc:DataFrame, script_file: str) -> None:
     with open("output/"+script_file, "w", encoding="utf8") as f:
         for line in lst: f.write(line)
 
-    print("\033[93m" + f"{vowels.detect_vowel('output/' + script_file)} error(s) found" + "\033[0m")
+    error_count = vowels.detect_vowel('output/' + script_file)
+    print("\033[93m" + f"{error_count} error(s) found" + "\033[0m")
     print("\033[92m" + f"{counter} point(s) replaced" + "\033[0m")
+    return error_count
 
 
 def decode(toc:DataFrame, script_file: str) -> None:

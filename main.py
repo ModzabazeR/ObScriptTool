@@ -12,6 +12,8 @@ from tkinter import filedialog, Tk
 
 root = Tk()
 root.withdraw()
+passed = 0
+failed = 0
 
 # https://stackoverflow.com/questions/287871/how-to-print-colored-text-to-the-terminal
 os.system("")
@@ -53,7 +55,9 @@ for script_file in filenames:
 	base_name = os.path.basename(script_file)
 	if config["mode"] == "encode":
 		print(f"Encoding... {base_name}")
-		alp.encode(entries, base_name)
+		error_count = alp.encode(entries, base_name)
+		if error_count > 0: failed += 1
+		else: passed += 1
 	else:
 		print(f"Decoding... {base_name}")
 		alp.decode(entries, base_name)
@@ -66,6 +70,7 @@ if want_update.lower() == "y":
 	print()
 
 print("All done.")
+print(f"\033[92mPassed: {passed}\033[0m, \033[91mFailed: {failed}\033[0m")
 print("Please check the output file.")
 print("If you want to add new strings and update the TOC file, please run the script again.")
 print()
