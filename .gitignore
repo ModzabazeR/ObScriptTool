@@ -135,5 +135,8 @@ sghdchar.py
 *.bat
 *.ico
 tips/
+input/
 output/
 atch/
+syntax_report.html
+syntax_report.txt

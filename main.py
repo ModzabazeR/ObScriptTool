@@ -45,22 +45,40 @@ if want_update.lower() == "y":
 	print("Updated entries: {0}".format(len(entries)))
 	print()
 
-# Encode the file
+# Pick a folder and gather script files recursively
 print("Mode: " + config["mode"])
-filenames = filedialog.askopenfilenames(title="File(s) to process")
+folder = filedialog.askdirectory(title="Folder to process (searched recursively)")
+print()
+if not folder:
+	print("No folder selected.")
+	input("Press enter to exit...")
+	exit()
+
+script_files = []
+for dirpath, dirnames, fnames in os.walk(folder):
+	# Don't descend into generated output or VCS folders
+	dirnames[:] = [d for d in dirnames if d not in ("output", ".git")]
+	for fname in fnames:
+		if fname.lower().endswith(".txt"):
+			script_files.append(os.path.join(dirpath, fname))
+script_files.sort()
+
+print(f"Found {len(script_files)} .txt file(s) under {folder}")
 print()
 alp.startup()
 print()
-for script_file in filenames:
-	base_name = os.path.basename(script_file)
+for script_file in script_files:
+	# Mirror the source folder structure under output/ to avoid name collisions
+	rel_path = os.path.relpath(script_file, folder)
+	output_file = os.path.join("output", rel_path)
 	if config["mode"] == "encode":
-		print(f"Encoding... {base_name}")
-		error_count = alp.encode(entries, base_name)
+		print(f"Encoding... {rel_path}")
+		error_count = alp.encode(entries, script_file, output_file)
 		if error_count > 0: failed += 1
 		else: passed += 1
 	else:
-		print(f"Decoding... {base_name}")
-		alp.decode(entries, base_name)
+		print(f"Decoding... {rel_path}")
+		alp.decode(entries, script_file, output_file)
 	print()
 
 # Rearrange TOC file
