@@ -41,6 +41,9 @@ CATS = {
     "dialogue: opens “ but never closes ” (continuation?)":
         ("Opens “ — no close (continues?)", "wrap", "open"),
     "dialogue: closes ” but never opens “": ("Closes ” — no open", "wrap", "close"),
+    "incomplete tag (missing ']')": ("Incomplete tag (missing ']')", "real", "ending"),
+    "incomplete tag (missing '[')": ("Incomplete tag (missing '[')", "real", "ending"),
+    "unmatched tags with CoZ Patch": ("Unmatched tags with CoZ Patch", "real", "ending"),
 }
 
 
@@ -59,6 +62,13 @@ def classify(msg, cell):
         if c and not o:
             return "dialogue: closes ” but never opens “"
         return "dialogue: missing both quotes"
+    if "incomplete tag" in msg:
+        if "missing ']'" in msg:
+            return "incomplete tag (missing ']')"
+        if "missing '['" in msg:
+            return "incomplete tag (missing '[')"
+    if "unmatched tags with CoZ Patch" in msg:
+        return msg
     return msg
 
 
@@ -94,6 +104,15 @@ def suggest_fix(cell, cat):
         if spoken.startswith(CLOSE_Q):
             return "fix", "The opening mark is `”` (a closing quote) — it should be the opening `“`."
         return "note", "Add an opening `“` before the first word — unless this continues a quote from a previous page."
+    if cat.startswith("incomplete tag (missing ']')"):
+        return "fix", "An opening bracket `[` is missing a closing `]`. Close the tag with `]`."
+    if cat.startswith("incomplete tag (missing '[')"):
+        return "fix", "A closing bracket `]` is missing an opening `[`. Open the tag with `[`."
+    if "unmatched tags with CoZ Patch" in cat:
+        m = re.search(r"\(([^)]+)\)", cat)
+        detail = m.group(1) if m else "tag mismatch"
+        detail_ticked = re.sub(r"(\[[^\]]+\])", r"`\1`", detail)
+        return "fix", f"Align the tags with the CoZ Patch ({detail_ticked})."
     return "note", ""
 
 
@@ -149,17 +168,19 @@ def collect(pattern):
         if not rows or THAI_COLUMN not in rows[0]:
             continue
         col = rows[0].index(THAI_COLUMN)
+        coz_col = rows[0].index("CoZ Patch") if "CoZ Patch" in rows[0] else -1
         for i, row in enumerate(rows[1:], start=2):
             if col >= len(row):
                 continue
             cell = row[col].strip()
             if not cell:
                 continue
-            for msg in syntax.check_line(cell):
+            ref_cell = row[coz_col].strip() if (coz_col >= 0 and coz_col < len(row) and row[coz_col].strip()) else None
+            for msg in syntax.check_line(cell, ref_cell):
                 cat = classify(msg, cell)
                 cat_counts[cat] = cat_counts.get(cat, 0) + 1
                 total += 1
-                by_file.setdefault(path, []).append((i, cat, cell))
+                by_file.setdefault(path, []).append((i, cat, cell, ref_cell))
     return len(files), by_file, cat_counts, total
 
 
@@ -167,7 +188,7 @@ def tally_real(by_file):
     """Count entries whose suggested fix is actionable (kind == 'fix')."""
     n = 0
     for entries in by_file.values():
-        for (_, cat, cell) in entries:
+        for (_, cat, cell, _) in entries:
             if suggest_fix(cell, cat)[0] == "fix":
                 n += 1
     return n
@@ -190,10 +211,14 @@ def build_text_report(scanned, by_file, cat_counts, total):
     for path in sorted(by_file):
         entries = by_file[path]
         out += ["", f"### {path} ({len(entries)} error(s))"]
-        for (row, cat, cell) in entries:
+        for (row, cat, cell, ref_cell) in entries:
             kind, fix = suggest_fix(cell, cat)
             out.append(f"  R{row}  [{cat}]")
-            out.append(f"    {cell}")
+            if "unmatched tags with CoZ Patch" in cat and ref_cell:
+                out.append(f"    CoZ:  {ref_cell}")
+                out.append(f"    Thai: {cell}")
+            else:
+                out.append(f"    {cell}")
             if fix:
                 out.append(f"    -> {kind.upper()}: {fix.replace('`', '')}")
     if not by_file:
@@ -213,7 +238,10 @@ def build_html(scanned, by_file, cat_counts, total, raw_text):
 
     legend = []
     for slug, (label, tier, hue) in CATS.items():
-        n = cat_counts.get(slug, 0)
+        if slug == "unmatched tags with CoZ Patch":
+            n = sum(count for k, count in cat_counts.items() if "unmatched tags with CoZ Patch" in k)
+        else:
+            n = cat_counts.get(slug, 0)
         legend.append(
             f'<button class="chip" data-cat="{hue}" data-tier="{tier}">'
             f'<span class="dot h-{hue}"></span>{html.escape(label)}'
@@ -230,8 +258,8 @@ def build_html(scanned, by_file, cat_counts, total, raw_text):
             fname = os.path.basename(p).replace(".SCX.csv", "")
             rel = p.replace("\\", "/")
             rows_html = []
-            for (rownum, cat, cell) in entries:
-                label, _cat_tier, hue = CATS[cat]
+            for (rownum, cat, cell, ref_cell) in entries:
+                label, _cat_tier, hue = CATS.get(cat, ("Unmatched tags with CoZ Patch", "real", "ending"))
                 kind, fix = suggest_fix(cell, cat)
                 tier = "real" if kind == "fix" else "wrap"
                 if tier == "real":
@@ -239,12 +267,21 @@ def build_html(scanned, by_file, cat_counts, total, raw_text):
                 fix_html = (f'<div class="fix {kind}"><span class="fix-k">'
                             f'{"FIX" if kind == "fix" else "NOTE"}</span>'
                             f'<span>{fmt_fix(fix)}</span></div>') if fix else ""
+                
+                if "unmatched tags with CoZ Patch" in cat and ref_cell:
+                    line_html = (
+                        f'<div class="ref-line"><span class="ref-label">CoZ:</span> {render_line(ref_cell, cat)}</div>'
+                        f'<div class="line"><span class="ref-label">Thai:</span> {render_line(cell, cat)}</div>'
+                    )
+                else:
+                    line_html = f'<div class="line">{render_line(cell, cat)}</div>'
+                
                 rows_html.append(
                     f'<li class="entry" data-tier="{tier}" data-cat="{hue}" '
                     f'data-search="{html.escape((fname + " " + cell).lower(), quote=True)}">'
                     f'<div class="meta"><span class="row">R{rownum}</span>'
                     f'<span class="tag h-{hue}">{html.escape(label)}</span></div>'
-                    f'<div class="body"><div class="line">{render_line(cell, cat)}</div>'
+                    f'<div class="body">{line_html}'
                     f'{fix_html}</div></li>'
                 )
             cards.append(
@@ -431,6 +468,11 @@ h1 .alt{color:var(--ink-dim)}
 .body{align-self:center;min-width:0}
 .line{font-family:var(--serif);font-size:16px;line-height:1.72;color:var(--ink);
   word-break:break-word}
+.ref-line{font-family:var(--serif);font-size:15px;line-height:1.72;color:var(--ink-dim);
+  word-break:break-word;margin-bottom:6px;border-bottom:1px dashed rgba(255,255,255,0.03);
+  padding-bottom:4px}
+.ref-label{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--ink-faint);
+  margin-right:8px;vertical-align:middle;text-transform:uppercase}
 .tok{font-family:var(--mono);font-size:.72em;color:var(--ink-faint);
   background:rgba(255,255,255,.025);border:1px solid var(--line);
   padding:0 4px;border-radius:2px;margin:0 1px;white-space:nowrap;

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Syntax validator for Operation Bifrost script files.
 
-Checks three structural rules on each non-empty line:
+Checks structural rules on each non-empty line:
   1. Every line ends with exactly ``[%p]`` or ``[%e]``.
   2. Dialogue lines (starting with ``[name]...[line]``) have their spoken text
      wrapped in the curly quotes ``“`` ... ``”``.
@@ -10,6 +10,10 @@ Checks three structural rules on each non-empty line:
      straight single quote (``'``) anywhere.
   4. Tag attribute values must be wrapped in double quotes, e.g.
      ``[margin top="228"]`` is valid but ``[margin top=228]`` is not.
+  5. Every tag must be complete (i.e. every open bracket ``[`` must be closed
+     with ``]``, and no nested tags or unmatched brackets).
+  6. If a reference line (e.g. English CoZ Patch) is provided, the tags in the
+     Thai translation line must match the reference tags.
 """
 from __future__ import annotations
 
@@ -30,9 +34,34 @@ def _strip_tags(text: str) -> str:
     return TAG_PATTERN.sub("", text)
 
 
-def check_line(line: str) -> list[str]:
+def check_line(line: str, ref_line: str | None = None) -> list[str]:
     """Return a list of rule-violation messages for a single line."""
     errors = []
+
+    # Rule 5: tag completeness (bracket matching)
+    opened_bracket_idx = -1
+    for i, char in enumerate(line):
+        if char == '[':
+            if opened_bracket_idx != -1:
+                # Previous open bracket was never closed
+                unclosed_context = line[opened_bracket_idx:i].strip()
+                errors.append(f"incomplete tag: '{unclosed_context}' (missing ']')")
+            opened_bracket_idx = i
+        elif char == ']':
+            if opened_bracket_idx == -1:
+                # Closing bracket with no opening bracket
+                start = i
+                while start > 0 and line[start-1] not in (' ', '[', ']'):
+                    start -= 1
+                unopened_context = line[start:i+1]
+                errors.append(f"incomplete tag: '{unopened_context}' (missing '[')")
+            else:
+                opened_bracket_idx = -1
+
+    if opened_bracket_idx != -1:
+        # End of line reached but bracket still open
+        unclosed_context = line[opened_bracket_idx:]
+        errors.append(f"incomplete tag: '{unclosed_context}' (missing ']')")
 
     # Rule 1: line ending
     if not line.endswith(LINE_END):
@@ -64,6 +93,29 @@ def check_line(line: str) -> list[str]:
             errors.append(
                 f"dialogue not wrapped in {OPEN_QUOTE} ... {CLOSE_QUOTE}"
             )
+
+
+    # Rule 6: unmatched tags with CoZ Patch reference line (checking color index 8A0000)
+    if ref_line is not None:
+        def normalize_tag(tag: str) -> str:
+            return tag[1:-1].strip().replace(" ", "").replace("'", '"').lower()
+        
+        target_normalized = 'colorindex="8a0000"'
+        ref_tags = [normalize_tag(t) for t in TAG_PATTERN.findall(ref_line)]
+        line_tags = [normalize_tag(t) for t in TAG_PATTERN.findall(line)]
+        
+        ref_count = ref_tags.count(target_normalized)
+        line_count = line_tags.count(target_normalized)
+        
+        if ref_count != line_count:
+            if ref_count > line_count:
+                diff = ref_count - line_count
+                missing_str = ', '.join(['[color index="8A0000"]'] * diff)
+                errors.append(f"unmatched tags with CoZ Patch (missing {missing_str})")
+            else:
+                diff = line_count - ref_count
+                extra_str = ', '.join(['[color index="8A0000"]'] * diff)
+                errors.append(f"unmatched tags with CoZ Patch (extra {extra_str})")
 
     return errors
 
