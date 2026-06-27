@@ -54,11 +54,14 @@ config.json → load TOC (encoding_toc.csv) + glyph pool
 
 Separate from encoding, there's a structural-syntax linter for the translated script.
 
-- **`syntax.py`** — validates one line at a time. `check_line(line)` returns a list of violation messages; `validate(file)` prints them and returns the count. Four rules:
+- **`syntax.py`** — validates one line at a time. `check_line(line, ref_line=None)` returns a list of violation messages; `validate(file)` prints them and returns the count. Seven rules:
   1. Every non-empty line ends with exactly `[%p]` or `[%e]`.
   2. Dialogue lines (`[name]…[line]…`) must wrap their spoken text in curly quotes `“ … ”`. Inline tags (e.g. `[color index="…"]`) may surround the quotes, so the check strips tags before testing the first/last visible glyph.
   3. Straight `"` is allowed **only inside** `[…]` tags (it's used for attribute values); straight `'` is **never** allowed.
   4. Tag attribute values must be double-quoted: `[margin top="228"]` is valid, `[margin top=228]` is not.
+  5. Every tag must be complete — each `[` is closed by a matching `]`, with no nested or unmatched brackets.
+  6. *(Reference-line check, only when `ref_line` is passed.)* The count of `[color index="8A0000"]` (phone-text) tags in the Thai line must match the reference (e.g. English CoZ Patch) line; a mismatch is reported as missing/extra tags.
+  7. Inside phone text (opened by `[color index="8A0000"]`), a later `[color index="A0140000"]` renders unreadably and must be `[color index="800000"]` instead. Only flagged when the `A0140000` follows an `8A0000` on the same line.
 
   `alphabet.encode()` calls `syntax.validate` on the source file so encoding surfaces syntax errors too (see above).
 

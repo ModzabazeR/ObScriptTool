@@ -14,6 +14,9 @@ Checks structural rules on each non-empty line:
      with ``]``, and no nested tags or unmatched brackets).
   6. If a reference line (e.g. English CoZ Patch) is provided, the tags in the
      Thai translation line must match the reference tags.
+  7. Inside phone text (opened with ``[color index="8A0000"]``), the color
+     ``[color index="A0140000"]`` renders unreadably and must be
+     ``[color index="800000"]`` instead.
 """
 from __future__ import annotations
 
@@ -28,10 +31,22 @@ NAME_LINE_PATTERN = re.compile(r"^\[name\].*?\[line\]")
 # An '=' inside a tag whose value is not immediately wrapped in double quotes.
 UNQUOTED_ATTR_PATTERN = re.compile(r'=\s*"[^"]*"')
 
+# Rule 7: phone-text color readability. Phone text is opened with color index
+# "8A0000"; inside it, color index "A0140000" renders unreadably and should be
+# "800000" instead. Compared in _normalize_tag form (lowercase, no spaces).
+PHONE_TEXT_COLOR = 'colorindex="8a0000"'
+UNREADABLE_PHONE_COLOR = 'colorindex="a0140000"'
+
 
 def _strip_tags(text: str) -> str:
     """Remove every ``[...]`` tag span so only displayed text remains."""
     return TAG_PATTERN.sub("", text)
+
+
+def _normalize_tag(tag: str) -> str:
+    """Normalize a ``[...]`` tag for comparison: drop the brackets and spaces,
+    treat single quotes as double quotes, and lowercase the result."""
+    return tag[1:-1].strip().replace(" ", "").replace("'", '"').lower()
 
 
 def check_line(line: str, ref_line: str | None = None) -> list[str]:
@@ -97,16 +112,12 @@ def check_line(line: str, ref_line: str | None = None) -> list[str]:
 
     # Rule 6: unmatched tags with CoZ Patch reference line (checking color index 8A0000)
     if ref_line is not None:
-        def normalize_tag(tag: str) -> str:
-            return tag[1:-1].strip().replace(" ", "").replace("'", '"').lower()
-        
-        target_normalized = 'colorindex="8a0000"'
-        ref_tags = [normalize_tag(t) for t in TAG_PATTERN.findall(ref_line)]
-        line_tags = [normalize_tag(t) for t in TAG_PATTERN.findall(line)]
-        
-        ref_count = ref_tags.count(target_normalized)
-        line_count = line_tags.count(target_normalized)
-        
+        ref_tags = [_normalize_tag(t) for t in TAG_PATTERN.findall(ref_line)]
+        line_tags = [_normalize_tag(t) for t in TAG_PATTERN.findall(line)]
+
+        ref_count = ref_tags.count(PHONE_TEXT_COLOR)
+        line_count = line_tags.count(PHONE_TEXT_COLOR)
+
         if ref_count != line_count:
             if ref_count > line_count:
                 diff = ref_count - line_count
@@ -116,6 +127,19 @@ def check_line(line: str, ref_line: str | None = None) -> list[str]:
                 diff = line_count - ref_count
                 extra_str = ', '.join(['[color index="8A0000"]'] * diff)
                 errors.append(f"unmatched tags with CoZ Patch (extra {extra_str})")
+
+    # Rule 7: once phone text is opened with color index "8A0000", a following
+    # color index "A0140000" is unreadable and must be "800000" instead.
+    in_phone_text = False
+    for tag in TAG_PATTERN.findall(line):
+        norm = _normalize_tag(tag)
+        if norm == PHONE_TEXT_COLOR:
+            in_phone_text = True
+        elif norm == UNREADABLE_PHONE_COLOR and in_phone_text:
+            errors.append(
+                'unreadable phone text color [color index="A0140000"] after '
+                '[color index="8A0000"] (use [color index="800000"] instead)'
+            )
 
     return errors
 
